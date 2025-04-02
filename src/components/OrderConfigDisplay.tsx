@@ -13,7 +13,6 @@ interface OrderConfigDisplayProps {
   expenseAmt: bigint;
   selectedFunction: ContractFunction | null;
   contractAddress: string;
-  contractABI: ContractFunction[];
   functionInputs: Record<string, string>;
   address: string | undefined;
 }
@@ -27,7 +26,6 @@ export function OrderConfigDisplay({
   expenseAmt,
   selectedFunction,
   contractAddress,
-  contractABI,
   functionInputs,
   address,
 }: OrderConfigDisplayProps) {
@@ -76,7 +74,6 @@ export function OrderConfigDisplay({
                       }] : []),
                       ...(selectedFunction && contractAddress && isAddress(contractAddress) ? [{
                         target: contractAddress,
-                        abi: contractABI,
                         functionName: selectedFunction.name,
                         args: selectedFunction.inputs.map(input => {
                           const value = functionInputs[input.name];
@@ -100,6 +97,7 @@ export function OrderConfigDisplay({
                           }
                           return value;
                         }),
+                        abi: [selectedFunction],
                       }] : []),
                     ],
                   }, null, 2)}
