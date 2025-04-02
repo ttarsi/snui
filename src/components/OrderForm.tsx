@@ -209,19 +209,6 @@ export function OrderForm({ sourceChain, destinationChain, sourceAsset, destinat
 
   return (
     <div className="space-y-4">
-      {!address && (
-        <div className="rounded-md bg-yellow-50 p-4">
-          <div className="flex">
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-yellow-800">Wallet Not Connected</h3>
-              <div className="mt-2 text-sm text-yellow-700">
-                <p>Please connect your wallet to execute orders.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {needsMainnetSwitch && (
         <div className="rounded-md bg-yellow-50 p-4">
           <div className="flex">
@@ -300,6 +287,19 @@ export function OrderForm({ sourceChain, destinationChain, sourceAsset, destinat
             </button>
           )}
         </div>
+
+        {!address && (
+          <div className="rounded-md bg-yellow-50 p-4">
+            <div className="flex">
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-yellow-800">Wallet Not Connected</h3>
+                <div className="mt-2 text-sm text-yellow-700">
+                  <p>Please connect your wallet to execute orders.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Order Status */}
         <OrderStatus 
