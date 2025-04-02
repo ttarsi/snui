@@ -415,6 +415,35 @@ export function OrderForm({ sourceChain, destinationChain, sourceAsset, destinat
           </div>
         )}
 
+        {order.status === 'open' && (
+          <div className="rounded-md bg-blue-50 p-4">
+            <div className="flex">
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-blue-800">Order Pending</h3>
+                <div className="mt-2 text-sm text-blue-700">
+                  <p>Your order is being processed. Please wait...</p>
+                  {order.txHash && (
+                    <p className="mt-1">
+                      Source Transaction: {sourceChain.blockExplorers?.default?.url ? (
+                        <a 
+                          href={`${sourceChain.blockExplorers.default.url}/tx/${order.txHash}`} 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className="inline-flex items-center text-blue-600 hover:text-blue-800 hover:underline font-medium"
+                        >
+                          View on Explorer →
+                        </a>
+                      ) : (
+                        <span className="font-mono text-sm">{order.txHash}</span>
+                      )}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {order.status === 'filled' && (
           <div className="rounded-md bg-green-50 p-4">
             <div className="flex">
