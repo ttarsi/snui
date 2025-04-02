@@ -101,72 +101,22 @@ export function OrderForm({ sourceChain, destinationChain, sourceAsset, destinat
       amount: parseUnits(amount || '0', destinationAsset?.decimals || 18),
     },
     mode: 'expense',
-    enabled: Boolean(amount && parseFloat(amount) > 0),
+    enabled: Boolean(amount && parseFloat(amount) > 0)
   });
 
   const depositAmt = quote.isSuccess ? quote.deposit.amount : BigInt(0);
   const expenseAmt = quote.isSuccess ? quote.expense.amount : BigInt(0);
 
   const getOrderConfig = () => {
-    // If we have a quote error, return a configuration that won't trigger validation
-    if (quote.isError) {
-      return {
-        srcChainId: sourceChain.id,
-        destChainId: destinationChain.id,
-        deposit: {
-          amount: BigInt(0),
-          ...(sourceAsset?.isNative ? {} : { 
-            token: sourceAsset?.address && isAddress(sourceAsset.address) ? sourceAsset.address as `0x${string}` : undefined 
-          }),
-        },
-        expense: {
-          amount: BigInt(0),
-          ...(destinationAsset?.isNative ? {} : {
-            token: destinationAsset?.address && isAddress(destinationAsset.address) ? destinationAsset.address as `0x${string}` : undefined,
-            ...(selectedFunction && contractAddress && isAddress(contractAddress) ? { 
-              spender: contractAddress as `0x${string}` 
-            } : {})
-          })
-        },
-        calls: [],
-        validateEnabled: false
-      };
-    }
-
-    // If we don't have a successful quote yet, return a configuration that won't trigger validation
-    if (!quote.isSuccess) {
-      return {
-        srcChainId: sourceChain.id,
-        destChainId: destinationChain.id,
-        deposit: {
-          amount: BigInt(0),
-          ...(sourceAsset?.isNative ? {} : { 
-            token: sourceAsset?.address && isAddress(sourceAsset.address) ? sourceAsset.address as `0x${string}` : undefined 
-          }),
-        },
-        expense: {
-          amount: BigInt(0),
-          ...(destinationAsset?.isNative ? {} : {
-            token: destinationAsset?.address && isAddress(destinationAsset.address) ? destinationAsset.address as `0x${string}` : undefined,
-            ...(selectedFunction && contractAddress && isAddress(contractAddress) ? { 
-              spender: contractAddress as `0x${string}` 
-            } : {})
-          })
-        },
-        calls: [],
-        validateEnabled: false
-      };
-    }
-
     const deposit = {
-      amount: depositAmt,
+      amount: quote.isSuccess ? quote.deposit.amount : (sourceAsset?.isNative ? parseEther(amount || '0') : parseUnits(amount || '0', sourceAsset?.decimals || 18)),
       ...(sourceAsset?.isNative ? {} : { 
         token: sourceAsset?.address && isAddress(sourceAsset.address) ? sourceAsset.address as `0x${string}` : undefined 
       }),
     };
 
     const expense = {
-      amount: expenseAmt,
+      amount: quote.isSuccess ? quote.expense.amount : (destinationAsset?.isNative ? parseEther(amount || '0') : parseUnits(amount || '0', destinationAsset?.decimals || 18)),
       ...(destinationAsset?.isNative ? {} : {
         token: destinationAsset?.address && isAddress(destinationAsset.address) ? destinationAsset.address as `0x${string}` : undefined,
         ...(selectedFunction && contractAddress && isAddress(contractAddress) ? { 
@@ -178,7 +128,7 @@ export function OrderForm({ sourceChain, destinationChain, sourceAsset, destinat
     const calls = [
       ...(destinationAsset?.isNative && address ? [{
         target: address,
-        value: expenseAmt
+        value: expense.amount
       }] : []),
       ...(selectedFunction && contractAddress && isAddress(contractAddress) ? [{
         target: contractAddress,
@@ -222,7 +172,7 @@ export function OrderForm({ sourceChain, destinationChain, sourceAsset, destinat
       deposit,
       expense: {
         ...expense,
-        amount: destinationAsset?.isNative && !address ? BigInt(0) : expenseAmt
+        amount: destinationAsset?.isNative && !address ? BigInt(0) : expense.amount
       },
       calls,
       validateEnabled: Boolean(address && amount && parseFloat(amount) > 0 && quote.isSuccess)
@@ -359,14 +309,13 @@ export function OrderForm({ sourceChain, destinationChain, sourceAsset, destinat
           validation={order.validation}
         />
 
-        {quote.isSuccess && (
-          <div className="rounded-md bg-green-50 p-4">
+        {quote.isPending && (
+          <div className="rounded-md bg-blue-50 p-4">
             <div className="flex">
               <div className="ml-3">
-                <h3 className="text-sm font-medium text-green-800">Quote Details</h3>
-                <div className="mt-2 text-sm text-green-700">
-                  <p>Deposit Amount: {formatUnits(quote.deposit.amount, sourceAsset?.decimals || 18)} {sourceAsset?.symbol}</p>
-                  <p>Expense Amount: {formatUnits(quote.expense.amount, destinationAsset?.decimals || 18)} {destinationAsset?.symbol}</p>
+                <h3 className="text-sm font-medium text-blue-800">Getting Quote...</h3>
+                <div className="mt-2 text-sm text-blue-700">
+                  <p>Please wait while we calculate the quote for your order.</p>
                 </div>
               </div>
             </div>
@@ -383,6 +332,20 @@ export function OrderForm({ sourceChain, destinationChain, sourceAsset, destinat
                   {quote.error && (
                     <p className="mt-1">Error details: {quote.error.message}</p>
                   )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {quote.isSuccess && (
+          <div className="rounded-md bg-green-50 p-4">
+            <div className="flex">
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-green-800">Quote Details</h3>
+                <div className="mt-2 text-sm text-green-700">
+                  <p>Deposit Amount: {formatUnits(quote.deposit.amount, sourceAsset?.decimals || 18)} {sourceAsset?.symbol}</p>
+                  <p>Expense Amount: {formatUnits(quote.expense.amount, destinationAsset?.decimals || 18)} {destinationAsset?.symbol}</p>
                 </div>
               </div>
             </div>
