@@ -226,6 +226,22 @@ export function OrderForm({ sourceChain, destinationChain, sourceAsset, destinat
               <h3 className="text-sm font-medium text-green-800">Order Filled</h3>
               <div className="mt-2 text-sm text-green-700">
                 <p>Your order has been successfully filled!</p>
+                {order.txHash && (
+                  <p className="mt-1">
+                    Source Transaction: {sourceChain.blockExplorers?.default?.url ? (
+                      <a 
+                        href={`${sourceChain.blockExplorers.default.url}/tx/${order.txHash}`} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="inline-flex items-center text-blue-600 hover:text-blue-800 hover:underline font-medium"
+                      >
+                        View on Explorer →
+                      </a>
+                    ) : (
+                      <span className="font-mono text-sm">{order.txHash}</span>
+                    )}
+                  </p>
+                )}
               </div>
             </div>
           </div>
