@@ -2,9 +2,14 @@ import { Chain } from 'wagmi/chains';
 import { isAddress } from 'viem';
 
 export interface ContractFunction {
-  type: string;
+  type: 'function';
   name: string;
   inputs: {
+    name: string;
+    type: string;
+    internalType: string;
+  }[];
+  outputs: {
     name: string;
     type: string;
     internalType: string;

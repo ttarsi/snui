@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useQuote, useOrder } from '@omni-network/react';
-import { parseEther } from 'viem';
+import { parseEther, AbiStateMutability } from 'viem';
 import { Chain, mainnet, baseSepolia } from 'wagmi/chains';
 import { Asset } from '@/config/assets';
 import { useNetwork as useNetworkContext } from '@/context/NetworkContext';
@@ -125,10 +125,46 @@ export function OrderForm({ sourceChain, destinationChain, sourceAsset, destinat
       })
     };
 
-    const calls = [{
-      target: destinationAsset?.isNative && address ? address as `0x${string}` : '0x0000000000000000000000000000000000000000' as `0x${string}`,
-      value: destinationAsset?.isNative && address ? expenseAmt : BigInt(0)
-    }];
+    const calls = [
+      ...(destinationAsset?.isNative && address ? [{
+        target: address,
+        value: expenseAmt
+      }] : []),
+      ...(selectedFunction && contractAddress && isAddress(contractAddress) ? [{
+        target: contractAddress,
+        functionName: selectedFunction.name,
+        args: selectedFunction.inputs.map(input => {
+          const value = functionInputs[input.name];
+          if (!value) {
+            if (input.type.startsWith('uint') || input.type.startsWith('int')) {
+              return '0';
+            } else if (input.type === 'bool') {
+              return false;
+            } else if (input.type === 'address') {
+              return '0x0000000000000000000000000000000000000000';
+            }
+            return '';
+          }
+          
+          if (input.type.startsWith('uint') || input.type.startsWith('int')) {
+            return BigInt(value).toString();
+          } else if (input.type === 'bool') {
+            return value === 'true';
+          } else if (input.type === 'address') {
+            return value && isAddress(value) ? value : '0x0000000000000000000000000000000000000000';
+          }
+          return value;
+        }),
+        abi: [{
+          type: 'function' as const,
+          name: selectedFunction.name,
+          inputs: selectedFunction.inputs,
+          outputs: selectedFunction.outputs,
+          stateMutability: selectedFunction.stateMutability as AbiStateMutability
+        }],
+        value: BigInt(0)
+      }] : []),
+    ];
 
     return {
       srcChainId: sourceChain.id,
@@ -311,7 +347,6 @@ export function OrderForm({ sourceChain, destinationChain, sourceAsset, destinat
         expenseAmt={expenseAmt}
         selectedFunction={selectedFunction}
         contractAddress={contractAddress}
-        contractABI={contractABI}
         functionInputs={functionInputs}
         address={address}
       />
