@@ -175,7 +175,7 @@ export function OrderForm({ sourceChain, destinationChain, sourceAsset, destinat
         amount: destinationAsset?.isNative && !address ? BigInt(0) : expenseAmt
       },
       calls,
-      validateEnabled: Boolean(address)
+      validateEnabled: Boolean(address && amount && parseFloat(amount) > 0)
     };
   };
 
