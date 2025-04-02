@@ -20,12 +20,12 @@ function NetworkToggle() {
 
 function ProvidersContent({ children }: { children: React.ReactNode }) {
   const { network } = useNetwork();
-  const chains = getSupportedChains(network) as [Chain, ...Chain[]];
-
+  const chains = getSupportedChains(network);
+  if (!chains.length) throw new Error('No supported chains found');
   const config = getDefaultConfig({
     appName: 'SolverNet UI',
     projectId: 'YOUR_PROJECT_ID', // You'll need to replace this with your WalletConnect project ID
-    chains,
+    chains: chains as unknown as [Chain, ...Chain[]],
   });
 
   const queryClient = new QueryClient();

@@ -10,6 +10,99 @@ import { getSupportedAssets } from '@/config/assets';
 import { useAccount, useChainId, useSwitchChain } from 'wagmi';
 import { isAddress } from 'viem';
 
+interface OrderStatusProps {
+  status: string;
+  txHash?: string;
+  sourceChain: Chain;
+  validation?: {
+    status: string;
+    rejectReason?: string;
+    rejectDescription?: string;
+  };
+}
+
+function OrderStatus({ status, txHash, sourceChain, validation }: OrderStatusProps) {
+  if (validation?.status === 'rejected') {
+    return (
+      <div className="rounded-md bg-red-50 p-4">
+        <div className="flex">
+          <div className="ml-3">
+            <h3 className="text-sm font-medium text-red-800">Order Rejected</h3>
+            <div className="mt-2 text-sm text-red-700">
+              <p>Reason: {validation.rejectReason}</p>
+              <p>Description: {validation.rejectDescription}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (status === 'open') {
+    return (
+      <div className="rounded-md bg-blue-50 p-4">
+        <div className="flex">
+          <div className="ml-3">
+            <h3 className="text-sm font-medium text-blue-800">Order Pending</h3>
+            <div className="mt-2 text-sm text-blue-700">
+              <p>Your order is being processed. Please wait...</p>
+              {txHash && (
+                <p className="mt-1">
+                  Source Transaction: {sourceChain.blockExplorers?.default?.url ? (
+                    <a 
+                      href={`${sourceChain.blockExplorers.default.url}/tx/${txHash}`} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="inline-flex items-center text-blue-600 hover:text-blue-800 hover:underline font-medium"
+                    >
+                      View on Explorer →
+                    </a>
+                  ) : (
+                    <span className="font-mono text-sm">{txHash}</span>
+                  )}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (status === 'filled') {
+    return (
+      <div className="rounded-md bg-green-50 p-4">
+        <div className="flex">
+          <div className="ml-3">
+            <h3 className="text-sm font-medium text-green-800">Order Filled</h3>
+            <div className="mt-2 text-sm text-green-700">
+              <p>Your order has been successfully filled!</p>
+              {txHash && (
+                <p className="mt-1">
+                  Source Transaction: {sourceChain.blockExplorers?.default?.url ? (
+                    <a 
+                      href={`${sourceChain.blockExplorers.default.url}/tx/${txHash}`} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="inline-flex items-center text-blue-600 hover:text-blue-800 hover:underline font-medium"
+                    >
+                      View on Explorer →
+                    </a>
+                  ) : (
+                    <span className="font-mono text-sm">{txHash}</span>
+                  )}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+}
+
 interface ContractFunction {
   name: string;
   inputs: {
@@ -25,6 +118,249 @@ interface OrderFormProps {
   destinationChain: Chain;
   sourceAsset: Asset | null;
   destinationAsset: Asset | null;
+}
+
+interface ContractCallSectionProps {
+  contractAddress: string;
+  setContractAddress: (address: string) => void;
+  contractABI: any[];
+  selectedFunction: ContractFunction | null;
+  setSelectedFunction: (func: ContractFunction | null) => void;
+  functionInputs: Record<string, string>;
+  setFunctionInputs: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  isLoadingABI: boolean;
+  abiError: string | null;
+  destinationChain: Chain;
+}
+
+function ContractCallSection({
+  contractAddress,
+  setContractAddress,
+  contractABI,
+  selectedFunction,
+  setSelectedFunction,
+  functionInputs,
+  setFunctionInputs,
+  isLoadingABI,
+  abiError,
+  destinationChain,
+}: ContractCallSectionProps) {
+  const writeFunctions = contractABI.filter(
+    (item: any) => item.type === 'function' && item.stateMutability !== 'view' && item.stateMutability !== 'pure'
+  );
+
+  const handleFunctionSelect = (func: ContractFunction) => {
+    setSelectedFunction(func);
+    const inputs: Record<string, string> = {};
+    func.inputs.forEach(input => {
+      inputs[input.name] = '';
+    });
+    setFunctionInputs(inputs);
+  };
+
+  const handleInputChange = (name: string, value: string) => {
+    setFunctionInputs((prev: Record<string, string>) => {
+      const newInputs: Record<string, string> = { ...prev };
+      newInputs[name] = value;
+      return newInputs;
+    });
+  };
+
+  return (
+    <div className="space-y-4">
+      <h3 className="text-lg font-medium text-gray-900">Contract Call</h3>
+      
+      <div>
+        <label className="block text-sm font-medium text-gray-700">Contract Address</label>
+        <input
+          type="text"
+          value={contractAddress}
+          onChange={(e) => setContractAddress(e.target.value)}
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+          placeholder="0x..."
+        />
+        {contractAddress && !isAddress(contractAddress) && (
+          <p className="mt-1 text-sm text-red-600">Invalid address format</p>
+        )}
+      </div>
+
+      {isLoadingABI && (
+        <div className="text-sm text-gray-500">Loading contract ABI...</div>
+      )}
+
+      {abiError && (
+        <div className="rounded-md bg-red-50 p-4">
+          <div className="flex">
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-red-800">Failed to Load Contract</h3>
+              <div className="mt-2 text-sm text-red-700">
+                <p>Unable to fetch contract ABI. This could be because:</p>
+                <ul className="list-disc pl-5 mt-1">
+                  <li>The contract is not verified on the block explorer</li>
+                  <li>The contract address is incorrect</li>
+                  <li>The contract is not deployed on this network</li>
+                  <li>API key is missing or invalid</li>
+                </ul>
+                <p className="mt-2">Error details: {abiError}</p>
+                <p className="mt-1">Chain: {destinationChain.name} ({destinationChain.id})</p>
+                <p className="mt-1">Contract: {contractAddress}</p>
+                <p className="mt-2">Please verify the contract address and try again.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {writeFunctions.length > 0 && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Select Function</label>
+          <select
+            value={selectedFunction?.name || ''}
+            onChange={(e) => {
+              const func = writeFunctions.find(f => f.name === e.target.value);
+              if (func) handleFunctionSelect(func);
+            }}
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+          >
+            <option value="">Select a function</option>
+            {writeFunctions.map((func: ContractFunction) => (
+              <option key={func.name} value={func.name}>
+                {func.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {selectedFunction && (
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-gray-700">Function Parameters</label>
+          {selectedFunction.inputs.map((input) => (
+            <div key={input.name}>
+              <label className="block text-sm text-gray-600">
+                {input.name} ({input.type})
+              </label>
+              <input
+                type="text"
+                value={functionInputs[input.name] || ''}
+                onChange={(e) => handleInputChange(input.name, e.target.value)}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+              />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface OrderConfigDisplayProps {
+  sourceChain: Chain;
+  destinationChain: Chain;
+  sourceAsset: Asset | null;
+  destinationAsset: Asset | null;
+  depositAmt: bigint;
+  expenseAmt: bigint;
+  selectedFunction: ContractFunction | null;
+  contractAddress: string;
+  contractABI: any[];
+  functionInputs: Record<string, string>;
+  address: string | undefined;
+}
+
+function OrderConfigDisplay({
+  sourceChain,
+  destinationChain,
+  sourceAsset,
+  destinationAsset,
+  depositAmt,
+  expenseAmt,
+  selectedFunction,
+  contractAddress,
+  contractABI,
+  functionInputs,
+  address,
+}: OrderConfigDisplayProps) {
+  const [showOrderConfig, setShowOrderConfig] = useState(false);
+
+  return (
+    <div className="mt-8 border-t pt-6">
+      <button
+        onClick={() => setShowOrderConfig(!showOrderConfig)}
+        className="flex items-center justify-between w-full text-left"
+      >
+        <h3 className="text-lg font-medium text-gray-900">Order Configuration</h3>
+        <span className="text-gray-500">
+          {showOrderConfig ? '▼' : '▶'}
+        </span>
+      </button>
+      
+      {showOrderConfig && (
+        <div className="mt-4 rounded-md bg-gray-50 p-4">
+          <div className="flex">
+            <div className="ml-3">
+              <div className="mt-2 text-sm text-gray-700">
+                <pre className="whitespace-pre-wrap font-mono text-xs">
+                  {JSON.stringify({
+                    srcChainId: sourceChain.id,
+                    destChainId: destinationChain.id,
+                    deposit: {
+                      amount: depositAmt.toString(),
+                      ...(sourceAsset?.isNative ? {} : { 
+                        token: sourceAsset?.address && isAddress(sourceAsset.address) ? sourceAsset.address : undefined 
+                      }),
+                    },
+                    expense: {
+                      amount: expenseAmt.toString(),
+                      ...(destinationAsset?.isNative ? {} : { 
+                        token: destinationAsset?.address && isAddress(destinationAsset.address) ? destinationAsset.address : undefined,
+                        ...(selectedFunction && contractAddress && isAddress(contractAddress) ? { 
+                          spender: contractAddress 
+                        } : {})
+                      }),
+                    },
+                    calls: [
+                      ...(destinationAsset?.isNative && address ? [{
+                        target: address,
+                        value: expenseAmt.toString()
+                      }] : []),
+                      ...(selectedFunction && contractAddress && isAddress(contractAddress) ? [{
+                        target: contractAddress,
+                        abi: contractABI,
+                        functionName: selectedFunction.name,
+                        args: selectedFunction.inputs.map(input => {
+                          const value = functionInputs[input.name];
+                          if (!value) {
+                            if (input.type.startsWith('uint') || input.type.startsWith('int')) {
+                              return '0';
+                            } else if (input.type === 'bool') {
+                              return false;
+                            } else if (input.type === 'address') {
+                              return '0x0000000000000000000000000000000000000000';
+                            }
+                            return '';
+                          }
+                          
+                          if (input.type.startsWith('uint') || input.type.startsWith('int')) {
+                            return BigInt(value).toString();
+                          } else if (input.type === 'bool') {
+                            return value === 'true';
+                          } else if (input.type === 'address') {
+                            return value && isAddress(value) ? value : '0x0000000000000000000000000000000000000000';
+                          }
+                          return value;
+                        }),
+                      }] : []),
+                    ],
+                  }, null, 2)}
+                </pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function OrderForm({ sourceChain, destinationChain, sourceAsset, destinationAsset }: OrderFormProps) {
@@ -110,7 +446,7 @@ export function OrderForm({ sourceChain, destinationChain, sourceAsset, destinat
 
   // Handle input change
   const handleInputChange = (name: string, value: string) => {
-    setFunctionInputs(prev => ({
+    setFunctionInputs((prev: Record<string, string>) => ({
       ...prev,
       [name]: value
     }));
@@ -152,16 +488,15 @@ export function OrderForm({ sourceChain, destinationChain, sourceAsset, destinat
   const depositAmt = quote.isSuccess ? quote.deposit.amount : BigInt(0);
   const expenseAmt = quote.isSuccess ? quote.expense.amount : BigInt(0);
 
-  const order = useOrder({
-    srcChainId: sourceChain.id,
-    destChainId: destinationChain.id,
-    deposit: {
+  const getOrderConfig = () => {
+    const deposit = {
       amount: depositAmt,
       ...(sourceAsset?.isNative ? {} : { 
         token: sourceAsset?.address && isAddress(sourceAsset.address) ? sourceAsset.address as `0x${string}` : undefined 
       }),
-    },
-    expense: {
+    };
+
+    const expense = {
       amount: expenseAmt,
       ...(destinationAsset?.isNative ? {} : {
         token: destinationAsset?.address && isAddress(destinationAsset.address) ? destinationAsset.address as `0x${string}` : undefined,
@@ -169,13 +504,24 @@ export function OrderForm({ sourceChain, destinationChain, sourceAsset, destinat
           spender: contractAddress as `0x${string}` 
         } : {})
       })
-    },
-    calls: [{
+    };
+
+    const calls = [{
       target: destinationAsset?.isNative && address ? address as `0x${string}` : '0x0000000000000000000000000000000000000000' as `0x${string}`,
       value: destinationAsset?.isNative && address ? expenseAmt : BigInt(0)
-    }],
-    validateEnabled: quote.isSuccess,
-  });
+    }];
+
+    return {
+      srcChainId: sourceChain.id,
+      destChainId: destinationChain.id,
+      deposit,
+      expense,
+      calls,
+      validateEnabled: quote.isSuccess,
+    };
+  };
+
+  const order = useOrder(getOrderConfig());
 
   const handleExecute = () => {
     if (!quote.isSuccess || !order.isReady || order.validation?.status !== 'accepted') return;
@@ -265,90 +611,18 @@ export function OrderForm({ sourceChain, destinationChain, sourceAsset, destinat
         </div>
 
         {/* Contract Call Section */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-medium text-gray-900">Contract Call</h3>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Contract Address</label>
-            <input
-              type="text"
-              value={contractAddress}
-              onChange={(e) => setContractAddress(e.target.value)}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-              placeholder="0x..."
-            />
-            {contractAddress && !isAddress(contractAddress) && (
-              <p className="mt-1 text-sm text-red-600">Invalid address format</p>
-            )}
-          </div>
-
-          {isLoadingABI && (
-            <div className="text-sm text-gray-500">Loading contract ABI...</div>
-          )}
-
-          {abiError && (
-            <div className="rounded-md bg-red-50 p-4">
-              <div className="flex">
-                <div className="ml-3">
-                  <h3 className="text-sm font-medium text-red-800">Failed to Load Contract</h3>
-                  <div className="mt-2 text-sm text-red-700">
-                    <p>Unable to fetch contract ABI. This could be because:</p>
-                    <ul className="list-disc pl-5 mt-1">
-                      <li>The contract is not verified on the block explorer</li>
-                      <li>The contract address is incorrect</li>
-                      <li>The contract is not deployed on this network</li>
-                      <li>API key is missing or invalid</li>
-                    </ul>
-                    <p className="mt-2">Error details: {abiError}</p>
-                    <p className="mt-1">Chain: {destinationChain.name} ({destinationChain.id})</p>
-                    <p className="mt-1">Contract: {contractAddress}</p>
-                    <p className="mt-2">Please verify the contract address and try again.</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {writeFunctions.length > 0 && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Select Function</label>
-              <select
-                value={selectedFunction?.name || ''}
-                onChange={(e) => {
-                  const func = writeFunctions.find(f => f.name === e.target.value);
-                  if (func) handleFunctionSelect(func);
-                }}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-              >
-                <option value="">Select a function</option>
-                {writeFunctions.map((func: ContractFunction) => (
-                  <option key={func.name} value={func.name}>
-                    {func.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {selectedFunction && (
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700">Function Parameters</label>
-              {selectedFunction.inputs.map((input) => (
-                <div key={input.name}>
-                  <label className="block text-sm text-gray-600">
-                    {input.name} ({input.type})
-                  </label>
-                  <input
-                    type="text"
-                    value={functionInputs[input.name] || ''}
-                    onChange={(e) => handleInputChange(input.name, e.target.value)}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                  />
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <ContractCallSection
+          contractAddress={contractAddress}
+          setContractAddress={setContractAddress}
+          contractABI={contractABI}
+          selectedFunction={selectedFunction}
+          setSelectedFunction={setSelectedFunction}
+          functionInputs={functionInputs}
+          setFunctionInputs={setFunctionInputs}
+          isLoadingABI={isLoadingABI}
+          abiError={abiError}
+          destinationChain={destinationChain}
+        />
 
         {/* Execute Order Button */}
         <div className="flex gap-4">
@@ -370,7 +644,14 @@ export function OrderForm({ sourceChain, destinationChain, sourceAsset, destinat
           )}
         </div>
 
-        {/* Quote Details */}
+        {/* Order Status */}
+        <OrderStatus 
+          status={order.status}
+          txHash={order.txHash}
+          sourceChain={sourceChain}
+          validation={order.validation}
+        />
+
         {quote.isSuccess && (
           <div className="rounded-md bg-green-50 p-4">
             <div className="flex">
@@ -400,157 +681,22 @@ export function OrderForm({ sourceChain, destinationChain, sourceAsset, destinat
             </div>
           </div>
         )}
-
-        {order.validation?.status === 'rejected' && (
-          <div className="rounded-md bg-red-50 p-4">
-            <div className="flex">
-              <div className="ml-3">
-                <h3 className="text-sm font-medium text-red-800">Order Rejected</h3>
-                <div className="mt-2 text-sm text-red-700">
-                  <p>Reason: {order.validation.rejectReason}</p>
-                  <p>Description: {order.validation.rejectDescription}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {order.status === 'open' && (
-          <div className="rounded-md bg-blue-50 p-4">
-            <div className="flex">
-              <div className="ml-3">
-                <h3 className="text-sm font-medium text-blue-800">Order Pending</h3>
-                <div className="mt-2 text-sm text-blue-700">
-                  <p>Your order is being processed. Please wait...</p>
-                  {order.txHash && (
-                    <p className="mt-1">
-                      Source Transaction: {sourceChain.blockExplorers?.default?.url ? (
-                        <a 
-                          href={`${sourceChain.blockExplorers.default.url}/tx/${order.txHash}`} 
-                          target="_blank" 
-                          rel="noopener noreferrer" 
-                          className="inline-flex items-center text-blue-600 hover:text-blue-800 hover:underline font-medium"
-                        >
-                          View on Explorer →
-                        </a>
-                      ) : (
-                        <span className="font-mono text-sm">{order.txHash}</span>
-                      )}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {order.status === 'filled' && (
-          <div className="rounded-md bg-green-50 p-4">
-            <div className="flex">
-              <div className="ml-3">
-                <h3 className="text-sm font-medium text-green-800">Order Filled</h3>
-                <div className="mt-2 text-sm text-green-700">
-                  <p>Your order has been successfully filled!</p>
-                  {order.txHash && (
-                    <p className="mt-1">
-                      Source Transaction: {sourceChain.blockExplorers?.default?.url ? (
-                        <a 
-                          href={`${sourceChain.blockExplorers.default.url}/tx/${order.txHash}`} 
-                          target="_blank" 
-                          rel="noopener noreferrer" 
-                          className="inline-flex items-center text-blue-600 hover:text-blue-800 hover:underline font-medium"
-                        >
-                          View on Explorer →
-                        </a>
-                      ) : (
-                        <span className="font-mono text-sm">{order.txHash}</span>
-                      )}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* Collapsible Order Configuration */}
-      <div className="mt-8 border-t pt-6">
-        <button
-          onClick={() => setShowOrderConfig(!showOrderConfig)}
-          className="flex items-center justify-between w-full text-left"
-        >
-          <h3 className="text-lg font-medium text-gray-900">Order Configuration</h3>
-          <span className="text-gray-500">
-            {showOrderConfig ? '▼' : '▶'}
-          </span>
-        </button>
-        
-        {showOrderConfig && (
-          <div className="mt-4 rounded-md bg-gray-50 p-4">
-            <div className="flex">
-              <div className="ml-3">
-                <div className="mt-2 text-sm text-gray-700">
-                  <pre className="whitespace-pre-wrap font-mono text-xs">
-                    {JSON.stringify({
-                      srcChainId: sourceChain.id,
-                      destChainId: destinationChain.id,
-                      deposit: {
-                        amount: depositAmt.toString(),
-                        ...(sourceAsset?.isNative ? {} : { 
-                          token: sourceAsset?.address && isAddress(sourceAsset.address) ? sourceAsset.address : undefined 
-                        }),
-                      },
-                      expense: {
-                        amount: expenseAmt.toString(),
-                        ...(destinationAsset?.isNative ? {} : { 
-                          token: destinationAsset?.address && isAddress(destinationAsset.address) ? destinationAsset.address : undefined,
-                          ...(selectedFunction && contractAddress && isAddress(contractAddress) ? { 
-                            spender: contractAddress 
-                          } : {})
-                        }),
-                      },
-                      calls: [
-                        ...(destinationAsset?.isNative && address ? [{
-                          target: address,
-                          value: expenseAmt.toString()
-                        }] : []),
-                        ...(selectedFunction && contractAddress && isAddress(contractAddress) ? [{
-                          target: contractAddress,
-                          abi: contractABI,
-                          functionName: selectedFunction.name,
-                          args: selectedFunction.inputs.map(input => {
-                            const value = functionInputs[input.name];
-                            if (!value) {
-                              if (input.type.startsWith('uint') || input.type.startsWith('int')) {
-                                return '0';
-                              } else if (input.type === 'bool') {
-                                return false;
-                              } else if (input.type === 'address') {
-                                return '0x0000000000000000000000000000000000000000';
-                              }
-                              return '';
-                            }
-                            
-                            if (input.type.startsWith('uint') || input.type.startsWith('int')) {
-                              return BigInt(value).toString();
-                            } else if (input.type === 'bool') {
-                              return value === 'true';
-                            } else if (input.type === 'address') {
-                              return value && isAddress(value) ? value : '0x0000000000000000000000000000000000000000';
-                            }
-                            return value;
-                          }),
-                        }] : []),
-                      ],
-                    }, null, 2)}
-                  </pre>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+      {/* Order Configuration Display */}
+      <OrderConfigDisplay
+        sourceChain={sourceChain}
+        destinationChain={destinationChain}
+        sourceAsset={sourceAsset}
+        destinationAsset={destinationAsset}
+        depositAmt={depositAmt}
+        expenseAmt={expenseAmt}
+        selectedFunction={selectedFunction}
+        contractAddress={contractAddress}
+        contractABI={contractABI}
+        functionInputs={functionInputs}
+        address={address}
+      />
     </div>
   );
 }
