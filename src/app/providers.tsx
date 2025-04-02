@@ -14,12 +14,6 @@ function NetworkToggle() {
 
   return (
     <div className="fixed top-4 right-4 z-50">
-      <button
-        onClick={() => setNetwork(network === 'mainnet' ? 'testnet' : 'mainnet')}
-        className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-      >
-        {network === 'mainnet' ? 'Switch to Testnet' : 'Switch to Mainnet'}
-      </button>
     </div>
   );
 }

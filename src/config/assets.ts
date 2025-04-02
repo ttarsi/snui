@@ -7,6 +7,7 @@ export interface Asset {
   decimals: number;
   minAmount: string;
   maxAmount: string;
+  isNative?: boolean;
 }
 
 export interface ChainAssets {
@@ -18,6 +19,15 @@ export const MAINNET_ASSETS: ChainAssets[] = [
   {
     chain: mainnet,
     assets: [
+      {
+        address: '0x0000000000000000000000000000000000000000', // Native ETH
+        symbol: 'ETH',
+        name: 'Ethereum',
+        decimals: 18,
+        minAmount: '0.001',
+        maxAmount: '1',
+        isNative: true,
+      },
       {
         address: '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48', // USDC
         symbol: 'USDC',
@@ -48,6 +58,15 @@ export const MAINNET_ASSETS: ChainAssets[] = [
     chain: base,
     assets: [
       {
+        address: '0x0000000000000000000000000000000000000000', // Native ETH
+        symbol: 'ETH',
+        name: 'Ethereum',
+        decimals: 18,
+        minAmount: '0.001',
+        maxAmount: '1',
+        isNative: true,
+      },
+      {
         address: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', // USDC
         symbol: 'USDC',
         name: 'USD Coin',
@@ -69,6 +88,15 @@ export const MAINNET_ASSETS: ChainAssets[] = [
     chain: optimism,
     assets: [
       {
+        address: '0x0000000000000000000000000000000000000000', // Native ETH
+        symbol: 'ETH',
+        name: 'Ethereum',
+        decimals: 18,
+        minAmount: '0.001',
+        maxAmount: '1',
+        isNative: true,
+      },
+      {
         address: '0x0b2c639c533813f4aa9d7837caf62653d097ff85', // USDC
         symbol: 'USDC',
         name: 'USD Coin',
@@ -81,6 +109,15 @@ export const MAINNET_ASSETS: ChainAssets[] = [
   {
     chain: arbitrum,
     assets: [
+      {
+        address: '0x0000000000000000000000000000000000000000', // Native ETH
+        symbol: 'ETH',
+        name: 'Ethereum',
+        decimals: 18,
+        minAmount: '0.001',
+        maxAmount: '1',
+        isNative: true,
+      },
       {
         address: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831', // USDC
         symbol: 'USDC',
@@ -97,6 +134,15 @@ export const TESTNET_ASSETS: ChainAssets[] = [
   {
     chain: baseSepolia,
     assets: [
+      {
+        address: '0x0000000000000000000000000000000000000000', // Native ETH
+        symbol: 'ETH',
+        name: 'Ethereum',
+        decimals: 18,
+        minAmount: '0.001',
+        maxAmount: '1',
+        isNative: true,
+      },
       {
         address: '0x036CbD53842c5426634e7929541eC2318f3dCF7e', // USDC
         symbol: 'USDC',
@@ -118,6 +164,15 @@ export const TESTNET_ASSETS: ChainAssets[] = [
   {
     chain: holesky,
     assets: [
+      {
+        address: '0x0000000000000000000000000000000000000000', // Native ETH
+        symbol: 'ETH',
+        name: 'Ethereum',
+        decimals: 18,
+        minAmount: '0.001',
+        maxAmount: '1',
+        isNative: true,
+      },
       {
         address: '0x8d09a4502cc8cf1547ad300e066060d043f6982d', // wstETH
         symbol: 'wstETH',
