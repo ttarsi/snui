@@ -101,7 +101,7 @@ export function OrderForm({ sourceChain, destinationChain, sourceAsset, destinat
       amount: parseUnits(amount || '0', destinationAsset?.decimals || 18),
     },
     mode: 'expense',
-    enabled: Boolean(amount && parseFloat(amount) > 0)
+    enabled: Boolean(amount && parseFloat(amount) > 0 && sourceAsset && destinationAsset)
   });
 
   const depositAmt = quote.isSuccess ? quote.deposit.amount : BigInt(0);
@@ -309,7 +309,7 @@ export function OrderForm({ sourceChain, destinationChain, sourceAsset, destinat
           validation={order.validation}
         />
 
-        {quote.isPending && (
+        {quote.isPending && amount && parseFloat(amount) > 0 && (
           <div className="rounded-md bg-blue-50 p-4">
             <div className="flex">
               <div className="ml-3">
