@@ -1,14 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuote, useOrder } from '@omni-network/react';
 import { parseEther } from 'viem';
-import { Chain } from 'wagmi/chains';
+import { Chain, mainnet, baseSepolia } from 'wagmi/chains';
 import { Asset } from '@/config/assets';
 import { useNetwork as useNetworkContext } from '@/context/NetworkContext';
 import { getSupportedAssets } from '@/config/assets';
-import { useAccount } from 'wagmi';
-import { useChainId, useSwitchChain } from 'wagmi';
+import { useAccount, useChainId, useSwitchChain } from 'wagmi';
 
 interface OrderFormProps {
   sourceChain: Chain;
@@ -24,6 +23,11 @@ export function OrderForm({ sourceChain, destinationChain, sourceAsset, destinat
   const { switchChain } = useSwitchChain();
   const supportedAssets = getSupportedAssets(network);
   const [amount, setAmount] = useState<string>('');
+
+  // Clear amount when network changes
+  useEffect(() => {
+    setAmount('');
+  }, [network]);
 
   const quote = useQuote({
     srcChainId: sourceChain.id,
@@ -67,14 +71,20 @@ export function OrderForm({ sourceChain, destinationChain, sourceAsset, destinat
     validateEnabled: quote.isSuccess,
   });
 
-  const handleQuote = () => {
-    if (!amount || parseFloat(amount) <= 0) return;
-  };
-
   const handleExecute = () => {
     if (!quote.isSuccess || !order.isReady || order.validation?.status !== 'accepted') return;
     
-    // Check if we're on the correct chain
+    // Check if we need to switch chains based on network toggle
+    if (network === 'mainnet' && chainId === baseSepolia.id) {
+      switchChain?.({ chainId: mainnet.id });
+      return;
+    }
+    if (network === 'testnet' && chainId === mainnet.id) {
+      switchChain?.({ chainId: baseSepolia.id });
+      return;
+    }
+
+    // Check if we're on the correct chain for the transaction
     if (chainId !== sourceChain.id) {
       switchChain?.({ chainId: sourceChain.id });
       return;
@@ -84,6 +94,9 @@ export function OrderForm({ sourceChain, destinationChain, sourceAsset, destinat
   };
 
   const isWrongChain = chainId !== sourceChain.id;
+
+  const needsMainnetSwitch = address && network === 'mainnet' && chainId === baseSepolia.id;
+  const needsTestnetSwitch = address && network === 'testnet' && chainId === mainnet.id;
 
   return (
     <div className="space-y-4">
@@ -100,13 +113,26 @@ export function OrderForm({ sourceChain, destinationChain, sourceAsset, destinat
         </div>
       )}
 
-      {address && isWrongChain && (
+      {needsMainnetSwitch && (
         <div className="rounded-md bg-yellow-50 p-4">
           <div className="flex">
             <div className="ml-3">
-              <h3 className="text-sm font-medium text-yellow-800">Wrong Network</h3>
+              <h3 className="text-sm font-medium text-yellow-800">Switch to Ethereum Mainnet</h3>
               <div className="mt-2 text-sm text-yellow-700">
-                <p>Please switch to {sourceChain.name} to execute this order.</p>
+                <p>Please switch to Ethereum Mainnet to continue.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {needsTestnetSwitch && (
+        <div className="rounded-md bg-yellow-50 p-4">
+          <div className="flex">
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-yellow-800">Switch to Base Sepolia</h3>
+              <div className="mt-2 text-sm text-yellow-700">
+                <p>Please switch to Base Sepolia to continue.</p>
               </div>
             </div>
           </div>
@@ -131,21 +157,22 @@ export function OrderForm({ sourceChain, destinationChain, sourceAsset, destinat
       </div>
 
       <div className="flex gap-4">
-        <button
-          onClick={handleQuote}
-          disabled={!amount || parseFloat(amount) <= 0}
-          className="inline-flex justify-center rounded-md border border-transparent bg-indigo-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50"
-        >
-          Get Quote
-        </button>
-
-        <button
-          onClick={handleExecute}
-          disabled={!address || !quote.isSuccess || !order.isReady || order.validation?.status !== 'accepted'}
-          className="inline-flex justify-center rounded-md border border-transparent bg-green-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50"
-        >
-          {isWrongChain ? `Switch to ${sourceChain.name}` : 'Execute Order'}
-        </button>
+        {isWrongChain ? (
+          <button
+            onClick={() => switchChain?.({ chainId: sourceChain.id })}
+            className="inline-flex justify-center rounded-md border border-transparent bg-blue-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-blue-600 disabled:opacity-70"
+          >
+            Switch to {sourceChain.name}
+          </button>
+        ) : (
+          <button
+            onClick={handleExecute}
+            disabled={!address || !quote.isSuccess || !order.isReady || order.validation?.status !== 'accepted'}
+            className="inline-flex justify-center rounded-md border border-transparent bg-green-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50"
+          >
+            Execute Order
+          </button>
+        )}
       </div>
 
       {quote.isSuccess && (

@@ -12,7 +12,7 @@ interface NetworkContextType {
 const NetworkContext = createContext<NetworkContextType | undefined>(undefined);
 
 export function NetworkProvider({ children }: { children: ReactNode }) {
-  const [network, setNetwork] = useState<Network>('testnet');
+  const [network, setNetwork] = useState<Network>('mainnet');
 
   return (
     <NetworkContext.Provider value={{ network, setNetwork }}>
