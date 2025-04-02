@@ -170,9 +170,12 @@ export function OrderForm({ sourceChain, destinationChain, sourceAsset, destinat
       srcChainId: sourceChain.id,
       destChainId: destinationChain.id,
       deposit,
-      expense,
+      expense: {
+        ...expense,
+        amount: destinationAsset?.isNative && !address ? BigInt(0) : expenseAmt
+      },
       calls,
-      validateEnabled: quote.isSuccess,
+      validateEnabled: Boolean(address)
     };
   };
 
