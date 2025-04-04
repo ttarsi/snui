@@ -181,26 +181,32 @@ export function OrderForm({ sourceChain, destinationChain, sourceAsset, destinat
 
   const order = useOrder(getOrderConfig());
 
-  const handleExecute = () => {
+  const handleExecute = async () => {
     if (!quote.isSuccess || !order.isReady || order.validation?.status !== 'accepted') return;
+    if (!address || !switchChain) return; // Ensure wallet is connected and switchChain is available
     
-    // Check if we need to switch chains based on network toggle
-    if (network === 'mainnet' && chainId === baseSepolia.id) {
-      switchChain?.({ chainId: mainnet.id });
-      return;
-    }
-    if (network === 'testnet' && chainId === mainnet.id) {
-      switchChain?.({ chainId: baseSepolia.id });
-      return;
-    }
+    try {
+      // Check if we need to switch chains based on network toggle
+      if (network === 'mainnet' && chainId === baseSepolia.id) {
+        await switchChain({ chainId: mainnet.id });
+        return;
+      }
+      if (network === 'testnet' && chainId === mainnet.id) {
+        await switchChain({ chainId: baseSepolia.id });
+        return;
+      }
 
-    // Check if we're on the correct chain for the transaction
-    if (chainId !== sourceChain.id) {
-      switchChain?.({ chainId: sourceChain.id });
-      return;
-    }
+      // Check if we're on the correct chain for the transaction
+      if (chainId !== sourceChain.id) {
+        await switchChain({ chainId: sourceChain.id });
+        return;
+      }
 
-    order.open();
+      await order.open();
+    } catch (error) {
+      console.error('Error executing order:', error);
+      // You might want to show this error to the user in the UI
+    }
   };
 
   const isWrongChain = chainId !== sourceChain.id;
