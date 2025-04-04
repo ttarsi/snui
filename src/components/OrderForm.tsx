@@ -31,6 +31,7 @@ export function OrderForm({ sourceChain, destinationChain, sourceAsset, destinat
   const [functionInputs, setFunctionInputs] = useState<Record<string, string>>({});
   const [isLoadingABI, setIsLoadingABI] = useState(false);
   const [abiError, setAbiError] = useState<string | null>(null);
+  const [executionError, setExecutionError] = useState<string | null>(null);
 
   // Clear amount when network changes
   useEffect(() => {
@@ -185,6 +186,8 @@ export function OrderForm({ sourceChain, destinationChain, sourceAsset, destinat
     if (!quote.isSuccess || !order.isReady || order.validation?.status !== 'accepted') return;
     if (!address || !switchChain) return; // Ensure wallet is connected and switchChain is available
     
+    setExecutionError(null); // Clear any previous errors
+    
     try {
       // Check if we need to switch chains based on network toggle
       if (network === 'mainnet' && chainId === baseSepolia.id) {
@@ -205,7 +208,15 @@ export function OrderForm({ sourceChain, destinationChain, sourceAsset, destinat
       await order.open();
     } catch (error) {
       console.error('Error executing order:', error);
-      // You might want to show this error to the user in the UI
+      if (error instanceof Error) {
+        if (error.message.includes('User rejected the request')) {
+          setExecutionError('Transaction was rejected in your wallet.');
+        } else {
+          setExecutionError(`Failed to execute order: ${error.message}`);
+        }
+      } else {
+        setExecutionError('An unknown error occurred while executing the order.');
+      }
     }
   };
 
@@ -352,6 +363,19 @@ export function OrderForm({ sourceChain, destinationChain, sourceAsset, destinat
                 <div className="mt-2 text-sm text-green-700">
                   <p>Deposit Amount: {formatUnits(quote.deposit.amount, sourceAsset?.decimals || 18)} {sourceAsset?.symbol}</p>
                   <p>Expense Amount: {formatUnits(quote.expense.amount, destinationAsset?.decimals || 18)} {destinationAsset?.symbol}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {executionError && (
+          <div className="rounded-md bg-red-50 p-4">
+            <div className="flex">
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-red-800">Transaction Error</h3>
+                <div className="mt-2 text-sm text-red-700">
+                  <p>{executionError}</p>
                 </div>
               </div>
             </div>
