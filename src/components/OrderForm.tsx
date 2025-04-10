@@ -1,16 +1,17 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useQuote, useOrder } from '@omni-network/react';
+import { useQuote, useOrder, withExecAndTransfer, useOmniContracts } from '@omni-network/react';
 import { parseEther, parseUnits, formatUnits, AbiStateMutability } from 'viem';
 import { Chain, mainnet, baseSepolia } from 'wagmi/chains';
 import { Asset } from '@/config/assets';
 import { useNetwork as useNetworkContext } from '@/context/NetworkContext';
 import { useAccount, useChainId, useSwitchChain } from 'wagmi';
-import { isAddress } from 'viem';
+import { isAddress, zeroAddress } from 'viem';
 import { OrderStatus } from './OrderStatus';
 import { ContractCallSection, ContractFunction } from './ContractCallSection';
 import { OrderConfigDisplay } from './OrderConfigDisplay';
+import { useReadContract, useWriteContract, useWatchContractEvent } from 'wagmi';
 
 interface OrderFormProps {
   sourceChain: Chain;
@@ -18,6 +19,29 @@ interface OrderFormProps {
   sourceAsset: Asset | null;
   destinationAsset: Asset | null;
 }
+
+const ERC20_ABI = [
+  {
+    type: 'function',
+    name: 'allowance',
+    inputs: [
+      { name: 'owner', type: 'address' },
+      { name: 'spender', type: 'address' }
+    ],
+    outputs: [{ type: 'uint256' }],
+    stateMutability: 'view'
+  },
+  {
+    type: 'function',
+    name: 'approve',
+    inputs: [
+      { name: 'spender', type: 'address' },
+      { name: 'amount', type: 'uint256' }
+    ],
+    outputs: [{ type: 'bool' }],
+    stateMutability: 'nonpayable'
+  }
+] as const;
 
 export function OrderForm({ sourceChain, destinationChain, sourceAsset, destinationAsset }: OrderFormProps) {
   const { network } = useNetworkContext();
@@ -32,6 +56,11 @@ export function OrderForm({ sourceChain, destinationChain, sourceAsset, destinat
   const [isLoadingABI, setIsLoadingABI] = useState(false);
   const [abiError, setAbiError] = useState<string | null>(null);
   const [executionError, setExecutionError] = useState<string | null>(null);
+  const contracts = useOmniContracts();
+  const middlemanAddress = contracts.data?.middleman ?? zeroAddress;
+  const inboxAddress = contracts.data?.inbox ?? zeroAddress;
+  const [needsApproval, setNeedsApproval] = useState<boolean>(false);
+  const [isApproving, setIsApproving] = useState<boolean>(false);
 
   // Clear amount when network changes
   useEffect(() => {
@@ -83,6 +112,90 @@ export function OrderForm({ sourceChain, destinationChain, sourceAsset, destinat
     fetchABI();
   }, [contractAddress, destinationChain.id]);
 
+  // Check allowance for ERC20 tokens
+  const { data: allowance, isLoading: isAllowanceLoading } = useReadContract({
+    address: sourceAsset?.address as `0x${string}`,
+    abi: ERC20_ABI,
+    functionName: 'allowance',
+    args: [address as `0x${string}`, inboxAddress],
+    chainId: sourceChain.id,
+    query: {
+      enabled: Boolean(
+        address && 
+        sourceAsset && 
+        !sourceAsset.isNative && 
+        amount && 
+        parseFloat(amount) > 0 &&
+        inboxAddress !== zeroAddress
+      )
+    }
+  });
+
+  const { writeContract: approve, data: approveData } = useWriteContract();
+
+  useWatchContractEvent({
+    address: sourceAsset?.address as `0x${string}`,
+    abi: ERC20_ABI,
+    eventName: 'Approval',
+    onLogs: () => {
+      setIsApproving(false);
+      setNeedsApproval(false);
+    }
+  });
+
+  // Check if approval is needed
+  useEffect(() => {
+    console.log('Allowance check:', {
+      allowance: allowance?.toString(),
+      amount,
+      sourceAsset,
+      isNative: sourceAsset?.isNative,
+      inboxAddress
+    });
+
+    // Reset approval state when amount changes
+    setIsApproving(false);
+
+    if (sourceAsset?.isNative || !amount || !sourceAsset || !inboxAddress || inboxAddress === zeroAddress) {
+      setNeedsApproval(false);
+      return;
+    }
+
+    // If we don't have an allowance yet, we need approval
+    if (!allowance) {
+      setNeedsApproval(true);
+      return;
+    }
+
+    const depositAmount = parseUnits(amount, sourceAsset.decimals);
+    const needsApproval = allowance < depositAmount;
+    console.log('Needs approval:', needsApproval, {
+      allowance: allowance.toString(),
+      depositAmount: depositAmount.toString()
+    });
+    setNeedsApproval(needsApproval);
+  }, [allowance, amount, sourceAsset, inboxAddress]);
+
+  const handleApprove = async () => {
+    if (!sourceAsset || !amount) return;
+    
+    setIsApproving(true);
+    try {
+      await approve({
+        address: sourceAsset.address as `0x${string}`,
+        abi: ERC20_ABI,
+        functionName: 'approve',
+        args: [
+          inboxAddress,
+          parseUnits(amount, sourceAsset.decimals)
+        ]
+      });
+    } catch (error) {
+      console.error('Approval error:', error);
+      setIsApproving(false);
+    }
+  };
+
   const quote = useQuote({
     srcChainId: sourceChain.id,
     destChainId: destinationChain.id,
@@ -119,10 +232,7 @@ export function OrderForm({ sourceChain, destinationChain, sourceAsset, destinat
     const expense = {
       amount: quote.isSuccess ? quote.expense.amount : (destinationAsset?.isNative ? parseEther(amount || '0') : parseUnits(amount || '0', destinationAsset?.decimals || 18)),
       ...(destinationAsset?.isNative ? {} : {
-        token: destinationAsset?.address && isAddress(destinationAsset.address) ? destinationAsset.address as `0x${string}` : undefined,
-        ...(selectedFunction && contractAddress && isAddress(contractAddress) ? { 
-          spender: contractAddress as `0x${string}` 
-        } : {})
+        token: destinationAsset?.address && isAddress(destinationAsset.address) ? destinationAsset.address as `0x${string}` : undefined
       })
     };
 
@@ -130,6 +240,22 @@ export function OrderForm({ sourceChain, destinationChain, sourceAsset, destinat
       ...(destinationAsset?.isNative && address ? [{
         target: address,
         value: expense.amount
+      }] : []),
+      ...(destinationAsset && !destinationAsset.isNative && address ? [{
+        target: destinationAsset.address as `0x${string}`,
+        functionName: 'transfer',
+        args: [address, expense.amount],
+        abi: [{
+          type: 'function' as const,
+          name: 'transfer',
+          inputs: [
+            { name: 'to', type: 'address' },
+            { name: 'amount', type: 'uint256' }
+          ],
+          outputs: [{ type: 'bool' }],
+          stateMutability: 'nonpayable' as const
+        }],
+        value: BigInt(0)
       }] : []),
       ...(selectedFunction && contractAddress && isAddress(contractAddress) ? [{
         target: contractAddress,
@@ -293,6 +419,14 @@ export function OrderForm({ sourceChain, destinationChain, sourceAsset, destinat
               className="inline-flex justify-center rounded-md border border-transparent bg-blue-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-blue-600 disabled:opacity-70"
             >
               Switch to {sourceChain.name}
+            </button>
+          ) : needsApproval ? (
+            <button
+              onClick={handleApprove}
+              disabled={!address || isApproving}
+              className="inline-flex justify-center rounded-md border border-transparent bg-green-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50"
+            >
+              {isApproving ? 'Approving...' : 'Approve Token'}
             </button>
           ) : (
             <button

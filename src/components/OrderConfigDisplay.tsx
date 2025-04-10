@@ -72,6 +72,22 @@ export function OrderConfigDisplay({
                         target: address,
                         value: expenseAmt.toString()
                       }] : []),
+                      ...(destinationAsset && !destinationAsset.isNative && address ? [{
+                        target: destinationAsset.address,
+                        functionName: 'transfer',
+                        args: [address, expenseAmt.toString()],
+                        abi: [{
+                          type: 'function',
+                          name: 'transfer',
+                          inputs: [
+                            { name: 'to', type: 'address' },
+                            { name: 'amount', type: 'uint256' }
+                          ],
+                          outputs: [{ type: 'bool' }],
+                          stateMutability: 'nonpayable'
+                        }],
+                        value: '0'
+                      }] : []),
                       ...(selectedFunction && contractAddress && isAddress(contractAddress) ? [{
                         target: contractAddress,
                         functionName: selectedFunction.name,
