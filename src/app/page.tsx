@@ -1,9 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Chain } from 'wagmi/chains';
+import { useState, useEffect, useMemo } from 'react';
+import { Chain, mainnet, base } from 'wagmi/chains';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
-import { useNetwork } from '@/context/NetworkContext';
 import { ChainSelector } from '@/components/ChainSelector';
 import { AssetSelector } from '@/components/AssetSelector';
 import { OrderForm } from '@/components/OrderForm';
@@ -12,10 +11,9 @@ import { Asset } from '@/config/assets';
 import { useSupportedTokens } from '@/hooks/useSupportedTokens';
 
 export default function Home() {
-  const { network, setNetwork } = useNetwork();
   const { tokens: allTokens, isLoading: isLoadingTokens, error: tokensError } = useSupportedTokens();
 
-  const supportedChains = getSupportedChains(network);
+  const supportedChains = getSupportedChains();
 
   const [sourceChain, setSourceChain] = useState<Chain>(supportedChains[0]);
   const [destinationChain, setDestinationChain] = useState<Chain>(supportedChains[1] ?? supportedChains[0]);
@@ -23,33 +21,37 @@ export default function Home() {
   const [sourceAsset, setSourceAsset] = useState<Asset | null>(null);
   const [destinationAsset, setDestinationAsset] = useState<Asset | null>(null);
 
-  const availableSourceAssets = allTokens.filter(token => token.chainId === sourceChain.id);
-  const availableDestinationAssets = allTokens.filter(token => token.chainId === destinationChain.id);
+  const availableSourceAssets = useMemo(() => 
+    allTokens.filter(token => token.chainId === sourceChain.id), 
+    [allTokens, sourceChain]
+  );
+  const availableDestinationAssets = useMemo(() => 
+    allTokens.filter(token => token.chainId === destinationChain.id), 
+    [allTokens, destinationChain]
+  );
 
   useEffect(() => {
-    if (availableSourceAssets.length > 0) {
-      setSourceAsset(availableSourceAssets[0]);
-    } else {
-      setSourceAsset(null);
+    const defaultAsset = availableSourceAssets.length > 0 ? availableSourceAssets[0] : null;
+
+    if (!sourceAsset || !availableSourceAssets.some(asset => asset.id === sourceAsset.id)) {
+      setSourceAsset(defaultAsset);
     }
-  }, [sourceChain, allTokens, availableSourceAssets]);
+  }, [sourceChain, availableSourceAssets]);
 
   useEffect(() => {
-    if (availableDestinationAssets.length > 0) {
-      setDestinationAsset(availableDestinationAssets[0]);
-    } else {
-      setDestinationAsset(null);
+    const defaultAsset = availableDestinationAssets.length > 0 ? availableDestinationAssets[0] : null;
+
+    if (!destinationAsset || !availableDestinationAssets.some(asset => asset.id === destinationAsset.id)) {
+      setDestinationAsset(defaultAsset);
     }
-  }, [destinationChain, allTokens, availableDestinationAssets]);
+  }, [destinationChain, availableDestinationAssets]);
 
   const handleSourceChainChange = (chain: Chain) => {
     setSourceChain(chain);
-    setSourceAsset(null);
   };
 
   const handleDestinationChainChange = (chain: Chain) => {
     setDestinationChain(chain);
-    setDestinationAsset(null);
   };
 
   return (
@@ -58,34 +60,7 @@ export default function Home() {
         <ConnectButton />
       </div>
       
-      <div className="fixed top-4 left-1/2 -translate-x-1/2">
-        <div className="inline-flex rounded-md shadow-sm" role="group">
-          <button
-            type="button"
-            onClick={() => setNetwork('mainnet')}
-            className={`px-4 py-2 text-sm font-medium border ${
-              network === 'mainnet'
-                ? 'bg-indigo-600 text-white border-indigo-600'
-                : 'bg-white text-gray-700 border-gray-300'
-            } rounded-l-lg hover:bg-gray-100 focus:z-10 focus:ring-2 focus:ring-indigo-500`}
-          >
-            Mainnet
-          </button>
-          <button
-            type="button"
-            onClick={() => setNetwork('testnet')}
-            className={`px-4 py-2 text-sm font-medium border-t border-b border-r ${
-              network === 'testnet'
-                ? 'bg-indigo-600 text-white border-indigo-600'
-                : 'bg-white text-gray-700 border-gray-300'
-            } rounded-r-lg hover:bg-gray-100 focus:z-10 focus:ring-2 focus:ring-indigo-500`}
-          >
-            Testnet
-          </button>
-        </div>
-      </div>
-
-      <div className="container mx-auto px-4 py-20">
+      <div className="container mx-auto px-4 py-20 pt-28">
         <h1 className="text-3xl font-bold text-gray-900 mb-8">SolverNet UI</h1>
 
         {isLoadingTokens && (

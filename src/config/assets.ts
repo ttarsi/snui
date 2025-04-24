@@ -18,10 +18,8 @@ export interface ChainAssets {
   assets: Asset[];
 }
 
-export const getSupportedAssets = (network: 'mainnet' | 'testnet', allTokens: Asset[]): ChainAssets[] => {
-  const targetChains = network === 'mainnet' 
-    ? [mainnet, base, optimism, arbitrum] 
-    : [baseSepolia, holesky];
+export const getSupportedAssets = (/* network: 'mainnet' | 'testnet', */ allTokens: Asset[]): ChainAssets[] => {
+  const targetChains = [mainnet, base, optimism, arbitrum]; // Always Mainnet
 
   return targetChains.map(chain => ({
     chain,
@@ -29,8 +27,6 @@ export const getSupportedAssets = (network: 'mainnet' | 'testnet', allTokens: As
   }));
 };
 
-export const getSupportedChains = (network: 'mainnet' | 'testnet') => {
-  return network === 'mainnet' 
-    ? [mainnet, base, optimism, arbitrum]
-    : [baseSepolia, holesky];
+export const getSupportedChains = () => {
+  return [mainnet, base, optimism, arbitrum]; // Always Mainnet
 }; 

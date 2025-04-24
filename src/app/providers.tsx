@@ -6,23 +6,14 @@ import { OmniProvider } from '@omni-network/react';
 import { getDefaultConfig, RainbowKitProvider } from '@rainbow-me/rainbowkit';
 import { Chain } from 'wagmi/chains';
 import '@rainbow-me/rainbowkit/styles.css';
-import { NetworkProvider, useNetwork } from '@/context/NetworkContext';
 import { getSupportedChains } from '@/config/assets';
 
-function NetworkToggle() {
-  return (
-    <div className="fixed top-4 right-4 z-50">
-    </div>
-  );
-}
-
 function ProvidersContent({ children }: { children: React.ReactNode }) {
-  const { network } = useNetwork();
-  const chains = getSupportedChains(network);
-  if (!chains.length) throw new Error('No supported chains found');
+  const chains = getSupportedChains();
+  if (!chains.length) throw new Error('No supported chains found for mainnet');
   const config = getDefaultConfig({
     appName: 'SolverNet UI',
-    projectId: 'YOUR_PROJECT_ID', // You'll need to replace this with your WalletConnect project ID
+    projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || 'YOUR_PROJECT_ID',
     chains: chains as unknown as [Chain, ...Chain[]],
   });
 
@@ -32,8 +23,7 @@ function ProvidersContent({ children }: { children: React.ReactNode }) {
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
         <RainbowKitProvider>
-          <OmniProvider env={network}>
-            <NetworkToggle />
+          <OmniProvider env={'mainnet'}>
             {children}
           </OmniProvider>
         </RainbowKitProvider>
@@ -44,8 +34,6 @@ function ProvidersContent({ children }: { children: React.ReactNode }) {
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <NetworkProvider>
-      <ProvidersContent>{children}</ProvidersContent>
-    </NetworkProvider>
+    <ProvidersContent>{children}</ProvidersContent>
   );
 } 

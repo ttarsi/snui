@@ -1,23 +1,24 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useQuote, useOrder, useOmniContracts } from '@omni-network/react';
 import { parseEther, parseUnits, formatUnits, AbiStateMutability } from 'viem';
 import { Chain, mainnet, baseSepolia } from 'wagmi/chains';
 import { Asset } from '@/config/assets';
-import { useNetwork as useNetworkContext } from '@/context/NetworkContext';
 import { useAccount, useChainId, useSwitchChain } from 'wagmi';
 import { isAddress, zeroAddress } from 'viem';
 import { OrderStatus } from './OrderStatus';
 import { ContractCallSection, ContractFunction } from './ContractCallSection';
 import { OrderConfigDisplay } from './OrderConfigDisplay';
 import { useReadContract, useWriteContract, useWatchContractEvent } from 'wagmi';
+import { useSendTransaction, useBalance, useWaitForTransactionReceipt } from 'wagmi';
+import { ConnectButton } from '@rainbow-me/rainbowkit';
 
 interface OrderFormProps {
   sourceChain: Chain;
   destinationChain: Chain;
-  sourceAsset: Asset | null;
-  destinationAsset: Asset | null;
+  sourceAsset: Asset;
+  destinationAsset: Asset;
 }
 
 const ERC20_ABI = [
@@ -43,10 +44,14 @@ const ERC20_ABI = [
   }
 ] as const;
 
-export function OrderForm({ sourceChain, destinationChain, sourceAsset, destinationAsset }: OrderFormProps) {
-  const { network } = useNetworkContext();
-  const { address } = useAccount();
-  const chainId = useChainId();
+export const OrderForm: React.FC<OrderFormProps> = ({ 
+  sourceChain, 
+  destinationChain, 
+  sourceAsset, 
+  destinationAsset 
+}) => {
+  const { address: connectedAddress, isConnected } = useAccount();
+  const currentChainId = useChainId();
   const { switchChain } = useSwitchChain();
   const [amount, setAmount] = useState<string>('');
   const [contractAddress, setContractAddress] = useState<string>('');
@@ -60,11 +65,17 @@ export function OrderForm({ sourceChain, destinationChain, sourceAsset, destinat
   const inboxAddress = contracts.data?.inbox ?? zeroAddress;
   const [needsApproval, setNeedsApproval] = useState<boolean>(false);
   const [isApproving, setIsApproving] = useState<boolean>(false);
+  const [orderResponse, setOrderResponse] = useState<any>(null);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [recipientAddress, setRecipientAddress] = useState<string>('');
+  const [pollIntervalId, setPollIntervalId] = useState<NodeJS.Timeout | null>(null);
+  const [orderStatus, setOrderStatus] = useState<any>(null);
 
   // Clear amount when network changes
   useEffect(() => {
     setAmount('');
-  }, [network]);
+  }, []);
 
   // Fetch ABI when contract address changes
   useEffect(() => {
@@ -116,11 +127,11 @@ export function OrderForm({ sourceChain, destinationChain, sourceAsset, destinat
     address: sourceAsset?.address as `0x${string}`,
     abi: ERC20_ABI,
     functionName: 'allowance',
-    args: [address as `0x${string}`, inboxAddress],
+    args: [connectedAddress as `0x${string}`, inboxAddress],
     chainId: sourceChain.id,
     query: {
       enabled: Boolean(
-        address && 
+        connectedAddress && 
         sourceAsset && 
         !sourceAsset.isNative && 
         amount && 
@@ -236,14 +247,14 @@ export function OrderForm({ sourceChain, destinationChain, sourceAsset, destinat
     };
 
     const calls = [
-      ...(destinationAsset?.isNative && address ? [{
-        target: address,
+      ...(destinationAsset?.isNative && connectedAddress ? [{
+        target: connectedAddress,
         value: expense.amount
       }] : []),
-      ...(destinationAsset && !destinationAsset.isNative && address ? [{
+      ...(destinationAsset && !destinationAsset.isNative && connectedAddress ? [{
         target: destinationAsset.address as `0x${string}`,
         functionName: 'transfer',
-        args: [address, expense.amount],
+        args: [connectedAddress, expense.amount],
         abi: [{
           type: 'function' as const,
           name: 'transfer',
@@ -298,85 +309,43 @@ export function OrderForm({ sourceChain, destinationChain, sourceAsset, destinat
       deposit,
       expense: {
         ...expense,
-        amount: destinationAsset?.isNative && !address ? BigInt(0) : expense.amount
+        amount: destinationAsset?.isNative && !connectedAddress ? BigInt(0) : expense.amount
       },
       calls,
-      validateEnabled: Boolean(address && amount && parseFloat(amount) > 0 && quote.isSuccess)
+      validateEnabled: Boolean(connectedAddress && amount && parseFloat(amount) > 0 && quote.isSuccess)
     };
   };
 
-  const order = useOrder(getOrderConfig());
+  const order = useOrder({
+    ...getOrderConfig(),
+  });
 
   const handleExecute = async () => {
     if (!quote.isSuccess || !order.isReady || order.validation?.status !== 'accepted') return;
-    if (!address || !switchChain) return; // Ensure wallet is connected and switchChain is available
+    if (!connectedAddress || !switchChain) return; // Ensure wallet is connected and switchChain is available
     
     setExecutionError(null); // Clear any previous errors
     
     try {
-      // Check if we need to switch chains based on network toggle
-      if (network === 'mainnet' && chainId === baseSepolia.id) {
-        await switchChain({ chainId: mainnet.id });
-        return;
-      }
-      if (network === 'testnet' && chainId === mainnet.id) {
-        await switchChain({ chainId: baseSepolia.id });
-        return;
-      }
-
       // Check if we're on the correct chain for the transaction
-      if (chainId !== sourceChain.id) {
+      if (currentChainId !== sourceChain.id) {
+        console.log(`Switching chain from ${currentChainId} to ${sourceChain.id}`);
         await switchChain({ chainId: sourceChain.id });
-        return;
+        return; // Exit after initiating switch, let user retry
       }
 
-      await order.open();
+      order.open?.();
+      console.log('Attempting to open order...');
     } catch (error) {
-      console.error('Error executing order:', error);
-      if (error instanceof Error) {
-        if (error.message.includes('User rejected the request')) {
-          setExecutionError('Transaction was rejected in your wallet.');
-        } else {
-          setExecutionError(`Failed to execute order: ${error.message}`);
-        }
-      } else {
-        setExecutionError('An unknown error occurred while executing the order.');
-      }
+      console.error('Execution error:', error);
+      setExecutionError(error instanceof Error ? error.message : 'Failed to execute order');
     }
   };
 
-  const isWrongChain = chainId !== sourceChain.id;
-  const needsMainnetSwitch = address && network === 'mainnet' && chainId === baseSepolia.id;
-  const needsTestnetSwitch = address && network === 'testnet' && chainId === mainnet.id;
+  const isWrongChain = currentChainId !== sourceChain.id;
 
   return (
     <div className="space-y-4">
-      {needsMainnetSwitch && (
-        <div className="rounded-md bg-yellow-50 p-4">
-          <div className="flex">
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-yellow-800">Switch to Ethereum Mainnet</h3>
-              <div className="mt-2 text-sm text-yellow-700">
-                <p>Please switch to Ethereum Mainnet to continue.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {needsTestnetSwitch && (
-        <div className="rounded-md bg-yellow-50 p-4">
-          <div className="flex">
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-yellow-800">Switch to Base Sepolia</h3>
-              <div className="mt-2 text-sm text-yellow-700">
-                <p>Please switch to Base Sepolia to continue.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Order Inputs */}
       <div className="space-y-4">
         <div className="space-y-2">
@@ -422,7 +391,7 @@ export function OrderForm({ sourceChain, destinationChain, sourceAsset, destinat
           ) : needsApproval ? (
             <button
               onClick={handleApprove}
-              disabled={!address || isApproving}
+              disabled={!connectedAddress || isApproving || !needsApproval}
               className="inline-flex justify-center rounded-md border border-transparent bg-green-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50"
             >
               {isApproving ? 'Approving...' : 'Approve Token'}
@@ -430,15 +399,15 @@ export function OrderForm({ sourceChain, destinationChain, sourceAsset, destinat
           ) : (
             <button
               onClick={handleExecute}
-              disabled={!address || !quote.isSuccess || !order.isReady || order.validation?.status !== 'accepted'}
+              disabled={!connectedAddress || !quote.isSuccess || !order.isReady || order.validation?.status !== 'accepted' || needsApproval || isWrongChain}
               className="inline-flex justify-center rounded-md border border-transparent bg-green-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50"
             >
-              Execute Order
+              {isWrongChain ? 'Switch Chain' : 'Execute Order'}
             </button>
           )}
         </div>
 
-        {!address && (
+        {!connectedAddress && (
           <div className="rounded-md bg-yellow-50 p-4">
             <div className="flex">
               <div className="ml-3">
@@ -527,7 +496,7 @@ export function OrderForm({ sourceChain, destinationChain, sourceAsset, destinat
         selectedFunction={selectedFunction}
         contractAddress={contractAddress}
         functionInputs={functionInputs}
-        address={address}
+        address={connectedAddress}
       />
     </div>
   );
