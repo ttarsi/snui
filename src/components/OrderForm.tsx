@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuote, useOrder, useOmniContracts } from '@omni-network/react';
 import { parseEther, parseUnits, formatUnits, AbiStateMutability } from 'viem';
-import { Chain, mainnet, baseSepolia } from 'wagmi/chains';
+import { Chain } from 'wagmi/chains';
 import { Asset } from '@/config/assets';
 import { useAccount, useChainId, useSwitchChain } from 'wagmi';
 import { isAddress, zeroAddress } from 'viem';
@@ -11,8 +11,6 @@ import { OrderStatus } from './OrderStatus';
 import { ContractCallSection, ContractFunction } from './ContractCallSection';
 import { OrderConfigDisplay } from './OrderConfigDisplay';
 import { useReadContract, useWriteContract, useWatchContractEvent } from 'wagmi';
-import { useSendTransaction, useBalance, useWaitForTransactionReceipt } from 'wagmi';
-import { ConnectButton } from '@rainbow-me/rainbowkit';
 
 interface OrderFormProps {
   sourceChain: Chain;
@@ -50,7 +48,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({
   sourceAsset, 
   destinationAsset 
 }) => {
-  const { address: connectedAddress, isConnected } = useAccount();
+  const { address: connectedAddress } = useAccount();
   const currentChainId = useChainId();
   const { switchChain } = useSwitchChain();
   const [amount, setAmount] = useState<string>('');
@@ -65,12 +63,6 @@ export const OrderForm: React.FC<OrderFormProps> = ({
   const inboxAddress = contracts.data?.inbox ?? zeroAddress;
   const [needsApproval, setNeedsApproval] = useState<boolean>(false);
   const [isApproving, setIsApproving] = useState<boolean>(false);
-  const [orderResponse, setOrderResponse] = useState<any>(null);
-  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
-  const [recipientAddress, setRecipientAddress] = useState<string>('');
-  const [pollIntervalId, setPollIntervalId] = useState<NodeJS.Timeout | null>(null);
-  const [orderStatus, setOrderStatus] = useState<any>(null);
 
   // Clear amount when network changes
   useEffect(() => {

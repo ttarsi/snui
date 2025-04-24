@@ -1,4 +1,4 @@
-import { Chain, baseSepolia, holesky, base, optimism, arbitrum, mainnet } from 'wagmi/chains';
+import { Chain, base, optimism, arbitrum, mainnet } from 'wagmi/chains';
 
 export interface Asset {
   id: string;

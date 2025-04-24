@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Chain, mainnet, base } from 'wagmi/chains';
+import { Chain } from 'wagmi/chains';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { ChainSelector } from '@/components/ChainSelector';
 import { AssetSelector } from '@/components/AssetSelector';
@@ -36,7 +36,7 @@ export default function Home() {
     if (!sourceAsset || !availableSourceAssets.some(asset => asset.id === sourceAsset.id)) {
       setSourceAsset(defaultAsset);
     }
-  }, [sourceChain, availableSourceAssets]);
+  }, [sourceChain, availableSourceAssets, sourceAsset]);
 
   useEffect(() => {
     const defaultAsset = availableDestinationAssets.length > 0 ? availableDestinationAssets[0] : null;
@@ -44,7 +44,7 @@ export default function Home() {
     if (!destinationAsset || !availableDestinationAssets.some(asset => asset.id === destinationAsset.id)) {
       setDestinationAsset(defaultAsset);
     }
-  }, [destinationChain, availableDestinationAssets]);
+  }, [destinationChain, availableDestinationAssets, destinationAsset]);
 
   const handleSourceChainChange = (chain: Chain) => {
     setSourceChain(chain);
