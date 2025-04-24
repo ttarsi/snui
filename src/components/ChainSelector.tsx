@@ -1,20 +1,22 @@
 'use client';
 
 import { Chain } from 'wagmi/chains';
-import { useNetwork } from '@/context/NetworkContext';
-import { getSupportedChains } from '@/config/assets';
 
 interface ChainSelectorProps {
   onSelect: (chain: Chain) => void;
   value?: Chain;
   label: string;
   placeholder?: string;
+  supportedChains: Chain[];
 }
 
-export function ChainSelector({ onSelect, value, label, placeholder = "Select chain" }: ChainSelectorProps) {
-  const { network } = useNetwork();
-  const supportedChains = getSupportedChains(network);
-
+export function ChainSelector({ 
+  onSelect, 
+  value, 
+  label, 
+  placeholder = "Select chain", 
+  supportedChains
+}: ChainSelectorProps) {
   return (
     <div>
       <label className="block text-sm font-medium text-gray-700">{label}</label>
@@ -25,6 +27,7 @@ export function ChainSelector({ onSelect, value, label, placeholder = "Select ch
           const chain = supportedChains.find((c: Chain) => c.id === Number(e.target.value));
           if (chain) onSelect(chain);
         }}
+        disabled={supportedChains.length === 0}
       >
         <option value="">{placeholder}</option>
         {supportedChains.map((chain: Chain) => (
