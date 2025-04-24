@@ -32,7 +32,7 @@ export default function Home() {
     } else {
       setSourceAsset(null);
     }
-  }, [sourceChain, allTokens]);
+  }, [sourceChain, allTokens, availableSourceAssets]);
 
   useEffect(() => {
     if (availableDestinationAssets.length > 0) {
@@ -40,7 +40,7 @@ export default function Home() {
     } else {
       setDestinationAsset(null);
     }
-  }, [destinationChain, allTokens]);
+  }, [destinationChain, allTokens, availableDestinationAssets]);
 
   const handleSourceChainChange = (chain: Chain) => {
     setSourceChain(chain);

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useQuote, useOrder, withExecAndTransfer, useOmniContracts } from '@omni-network/react';
+import { useQuote, useOrder, useOmniContracts } from '@omni-network/react';
 import { parseEther, parseUnits, formatUnits, AbiStateMutability } from 'viem';
 import { Chain, mainnet, baseSepolia } from 'wagmi/chains';
 import { Asset } from '@/config/assets';
@@ -57,7 +57,6 @@ export function OrderForm({ sourceChain, destinationChain, sourceAsset, destinat
   const [abiError, setAbiError] = useState<string | null>(null);
   const [executionError, setExecutionError] = useState<string | null>(null);
   const contracts = useOmniContracts();
-  const middlemanAddress = contracts.data?.middleman ?? zeroAddress;
   const inboxAddress = contracts.data?.inbox ?? zeroAddress;
   const [needsApproval, setNeedsApproval] = useState<boolean>(false);
   const [isApproving, setIsApproving] = useState<boolean>(false);
@@ -113,7 +112,7 @@ export function OrderForm({ sourceChain, destinationChain, sourceAsset, destinat
   }, [contractAddress, destinationChain.id]);
 
   // Check allowance for ERC20 tokens
-  const { data: allowance, isLoading: isAllowanceLoading } = useReadContract({
+  const { data: allowance } = useReadContract({
     address: sourceAsset?.address as `0x${string}`,
     abi: ERC20_ABI,
     functionName: 'allowance',
@@ -131,7 +130,7 @@ export function OrderForm({ sourceChain, destinationChain, sourceAsset, destinat
     }
   });
 
-  const { writeContract: approve, data: approveData } = useWriteContract();
+  const { writeContract: approve } = useWriteContract();
 
   useWatchContractEvent({
     address: sourceAsset?.address as `0x${string}`,

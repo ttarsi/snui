@@ -28,7 +28,7 @@ const chainIdMap: Record<number, Chain> = {
 };
 
 // Placeholder for fetching token icons (replace with actual logic if available)
-const getTokenIconUrl = (symbol: string): string => {
+const getTokenIconUrl = (/* symbol: string */): string => {
     // Example: return `/icons/${symbol.toLowerCase()}.svg`;
     return ''; // No icons for now
 };
@@ -66,7 +66,7 @@ export const useSupportedTokens = () => {
                decimals: isNative ? nativeCurrency.decimals : token.decimals,
                isNative: isNative,
                chainId: token.chainId, // Keep chainId for easier filtering
-               logoURI: getTokenIconUrl(token.symbol), // Add logo URI if available
+               logoURI: getTokenIconUrl(/* token.symbol */), // Add logo URI if available
                // minAmount/maxAmount would likely come from API or config, using placeholders
                minAmount: '0.001',
                maxAmount: '1000',
